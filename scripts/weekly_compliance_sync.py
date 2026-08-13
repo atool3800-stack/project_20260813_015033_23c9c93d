@@ -41,11 +41,13 @@ The token only needs:
 - pull requests write (open the weekly PR).
 """
 
+import http.client
 import json
 import os
 import re
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import date, datetime, timezone
@@ -81,7 +83,11 @@ TOP_N_PER_COUNTRY = 10
 # HTTP helper (stdlib only)                                                   #
 # --------------------------------------------------------------------------- #
 def api_request(method, path, token=GITHUB_TOKEN, payload=None, per_page=None, page=None):
-    """Minimal GitHub REST API client. Returns parsed JSON (or None)."""
+    """Minimal GitHub REST API client. Returns parsed JSON (or None).
+
+    Retries transient network / HTTP errors with exponential backoff so the
+    weekly job is resilient to the occasional dropped connection.
+    """
     url = f"{GITHUB_API_URL}{path}"
     query = []
     if per_page:
@@ -103,15 +109,35 @@ def api_request(method, path, token=GITHUB_TOKEN, payload=None, per_page=None, p
         headers["Content-Type"] = "application/json"
 
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            body = resp.read().decode("utf-8")
-            return json.loads(body) if body else None
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(
-            f"GitHub API {method} {path} failed: {exc.code} - {detail[:500]}"
-        ) from exc
+
+    max_attempts = 5
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                body = resp.read().decode("utf-8")
+                return json.loads(body) if body else None
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            # 5xx and rate-limit responses are retryable
+            if exc.code >= 500 or exc.code in (403, 429):
+                if attempt == max_attempts:
+                    raise RuntimeError(
+                        f"GitHub API {method} {path} failed: {exc.code} - {detail[:500]}"
+                    ) from exc
+                time.sleep(2 ** attempt)
+                continue
+            raise RuntimeError(
+                f"GitHub API {method} {path} failed: {exc.code} - {detail[:500]}"
+            ) from exc
+        except (urllib.error.URLError, http.client.HTTPException, ConnectionError,
+                OSError, TimeoutError) as exc:
+            if attempt == max_attempts:
+                raise RuntimeError(
+                    f"GitHub API {method} {path} network error after {max_attempts} attempts: {exc}"
+                ) from exc
+            time.sleep(2 ** attempt)
+
+    return None
 
 
 def fetch_all_open_issues():
@@ -201,7 +227,7 @@ def build_markdown(issues, run_date):
     lines = []
     lines.append("## Weekly Compliance Audit Summary")
     lines.append("")
-    lines.append(f"_Last generated: {run_date} (UTC) · Source: {REPO_FULL_NAME}_")
+    lines.append(f"_Last generated: {run_date} UTC · Source: {REPO_FULL_NAME}_")
     lines.append("")
 
     # --- Overall statistics table ---
@@ -371,7 +397,7 @@ def main():
     if not GITHUB_TOKEN:
         sys.exit("GITHUB_TOKEN is required (set the environment variable).")
 
-    run_date = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    run_date = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
 
     print(f"[1/5] Fetching open issues from {REPO_FULL_NAME} ...")
     raw_issues = fetch_all_open_issues()
