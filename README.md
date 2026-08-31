@@ -29,6 +29,44 @@ the refreshed summary. **Do not edit the block between the two markers below
 manually** - it is regenerated automatically.
 
 <!-- WEEKLY-COMPLIANCE-START -->
+## Weekly Compliance Audit Summary
+
+_Last generated: 2026-08-31 12:32 UTC · Source: atool3800-stack/project_20260813_015033_23c9c93d_
+
+### Overall Statistics
+
+| Metric | Count |
+| --- | ---: |
+| Open compliance issues | 0 |
+| United Kingdom (UK) | 0 |
+| France (FR) | 0 |
+| Germany (DE) | 0 |
+| Priority P0 (critical) | 0 |
+| Priority P1 (high) | 0 |
+| Priority P2 (normal) | 0 |
+
+### Priority Distribution by Country
+
+| Country | P0 | P1 | P2 | Total |
+| --- | ---: | ---: | ---: | ---: |
+| United Kingdom (UK) | 0 | 0 | 0 | 0 |
+| France (FR) | 0 | 0 | 0 | 0 |
+| Germany (DE) | 0 | 0 | 0 | 0 |
+| **Total** | **0** | **0** | **0** | **0** |
+
+### High-Risk Open Items (P0 / P1)
+
+#### United Kingdom (UK)
+
+_No open high-priority items._
+
+#### France (FR)
+
+_No open high-priority items._
+
+#### Germany (DE)
+
+_No open high-priority items._
 <!-- WEEKLY-COMPLIANCE-END -->
 
 ## Operations
